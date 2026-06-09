@@ -12,6 +12,41 @@ Useful when a 1 Gbit line tests near line-rate locally but a single-stream downl
 distant server stalls at a fraction of that, and you want to know whether it's your box,
 the server, or the path — before blaming the ISP.
 
+## Terminology
+
+- **RTT (round-trip time)** — how long a packet takes to reach the server and the
+  acknowledgement to come back. Every TCP window mechanism scales with it.
+  *Example: Amsterdam from Athens might be ~45 ms; a server in the same city ~2 ms.*
+- **BDP (bandwidth-delay product)** — `line_rate × RTT`: how many bytes must be "in the
+  air" (sent but not yet acknowledged) at any instant to keep the line full.
+  *Example: 1 Gbit/s × 45 ms = 125 MB/s × 0.045 s ≈ 5.6 MB. Below ~5.6 MB of in-flight
+  data, that link physically cannot run at 1 Gbit/s with a single flow.*
+- **Receive window (rwnd)** — how much data *you* tell the server it may send before it
+  must stop and wait for your ACKs. Advertised in every packet you send back; capped by
+  your kernel's `net.ipv4.tcp_rmem`.
+  *Example: with a 2 MiB window on a 45 ms path, a flow tops out at 2 MiB / 0.045 s ≈
+  355 Mbit/s — no matter how fast the line is.*
+- **Send window / cwnd (congestion window)** — the server-side equivalent: how much
+  un-ACKed data the *sender* is willing to keep in flight, limited by its send buffer
+  (`tcp_wmem`) and its congestion-control algorithm.
+  *Example: a server capped at 0.6 MiB in flight delivers at most 0.6 MiB / 0.045 s ≈
+  107 Mbit/s to you, even if both your window and your line are huge.*
+- **In-flight bytes** — data already sent but not yet acknowledged, measured from the
+  capture. Peak shows the most the server ever risked; p95 is a steadier estimate.
+- **Sustained in-flight** — `throughput × RTT`, the in-flight level actually *maintained*
+  on average. A big gap between peak and sustained means bursts followed by back-off —
+  a loss/queueing signal.
+- **Window scale** — TCP's window field is only 16 bits (max 64 KiB), so both ends agree
+  on a multiplier at handshake. *Example: raw 49152 with scale 7 → 49152 × 2⁷ = 6 MiB.*
+- **rcv_space** — the kernel's running estimate of the receive buffer this socket needs;
+  a lower-bound hint for your window when the capture misses it.
+- **Bufferbloat** — oversized queues in routers fill up under load, inflating the RTT
+  (and therefore the BDP) instead of dropping packets early.
+  *Example: idle ping 15 ms that climbs to 200 ms during a download is bufferbloat.*
+- **CUBIC / BBR** — congestion-control algorithms on the *sender*. CUBIC (the default)
+  halves its rate on loss and recovers slowly on long paths; BBR models the path's
+  bandwidth and RTT instead, and tolerates light loss far better.
+
 ## Requirements (Linux only)
 
 `ss` (iproute2), `tcpdump`, `tshark`, `awk`, GNU `grep` (with `-P`), `sed`, coreutils,
