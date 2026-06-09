@@ -1,5 +1,7 @@
 # tcp-window-check
 
+🇬🇧 English · 🇬🇷 [Ελληνικά](README.el.md)
+
 Diagnose why a **single TCP connection** can't fill your link. The script drives one flow
 to a target, measures the live socket plus a scoped packet capture, and tells you whether
 the ceiling is **your receive window**, the **server's send window/cwnd**, or
