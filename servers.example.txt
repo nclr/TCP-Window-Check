@@ -1,0 +1,19 @@
+# Example server list for: ./tcp-window-check.sh --servers servers.example.txt
+#
+# One URL per line; blank lines and '#' comments are ignored.
+# These are DataPacket's public European speed-test files
+# (https://www.datapacket.com/speed-test-files/europe).
+# 1000mb.bin keeps each run short; switch to 1gb.bin or 10gb.bin for
+# fast lines / longer DURATION so the download outlives the sample window.
+
+https://ams.download.datapacket.com/1000mb.bin    # Amsterdam
+https://fra.download.datapacket.com/1000mb.bin    # Frankfurt
+https://lon.download.datapacket.com/1000mb.bin    # London
+https://par.download.datapacket.com/1000mb.bin    # Paris
+https://prg.download.datapacket.com/1000mb.bin    # Prague
+https://vie.download.datapacket.com/1000mb.bin    # Vienna
+https://waw.download.datapacket.com/1000mb.bin    # Warsaw
+https://mil.download.datapacket.com/1000mb.bin    # Milan
+https://mad.download.datapacket.com/1000mb.bin    # Madrid
+https://sto.download.datapacket.com/1000mb.bin    # Stockholm
+https://ath.download.datapacket.com/1000mb.bin    # Athens

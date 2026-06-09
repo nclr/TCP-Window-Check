@@ -39,10 +39,22 @@ chmod +x tcp-window-check.sh
 
 # ή σύνδεση σε μια ροή που ξεκινάτε εσείς (π.χ. το δικό σας `aria2c -x1`) προς μια IP:
 HOST=203.0.113.7 ./tcp-window-check.sh
+
+# ή δοκιμή μιας ολόκληρης λίστας server, ένας-ένας, με συγκεντρωτικό πίνακα κατάταξης:
+./tcp-window-check.sh --servers servers.example.txt
 ```
+
+Το αρχείο λίστας περιέχει ένα URL ανά γραμμή (σχόλια με `#` και κενές γραμμές αγνοούνται).
+Το `servers.example.txt` έρχεται έτοιμο με τα [ευρωπαϊκά αρχεία speed-test της DataPacket](https://www.datapacket.com/speed-test-files/europe)
+— χρήσιμο για επιλογή του καλύτερου mirror ή σύγκριση διαδρομών.
 
 Τρέξτε το ως **κανονικός χρήστης** — μόνο το `tcpdump` ανυψώνει δικαιώματα μόνο του μέσω
 `sudo`. Το να τρέξετε ολόκληρο το script υπό `sudo` θα έτρεχε άσκοπα τον downloader ως root.
+
+Η έξοδος έχει χρώματα όταν το stdout είναι τερματικό (τα πορίσματα κωδικοποιούνται
+χρωματικά: πράσινο OK, κίτρινο receive-window, ματζέντα server send-window, κόκκινο
+loss/congestion). Τα χρώματα απενεργοποιούνται αυτόματα όταν η έξοδος πηγαίνει σε αρχείο,
+και η σύμβαση [`NO_COLOR`](https://no-color.org/) γίνεται σεβαστή.
 
 ### Μεταβλητές περιβάλλοντος
 
@@ -53,6 +65,71 @@ HOST=203.0.113.7 ./tcp-window-check.sh
 | `WORKDIR`        | `/var/tmp`               | Προσωρινός φάκελος σε δίσκο (αποφύγετε το `/tmp`, συχνά σε RAM).|
 | `ARIA2_OPTS`     | flags μονής σύνδεσης     | Αντικατάσταση των flags του downloader.                        |
 | `DEBUG`          | `0`                      | Ιχνηλάτηση με `set -x`.                                         |
+
+## Παράδειγμα εξόδου
+
+Μια απλή εκτέλεση τυπώνει κάθε μετρική με επεξήγηση σε απλή γλώσσα, ένα ραβδόγραμμα που
+συγκρίνει τα παράθυρα με το BDP, και ένα πόρισμα που εξηγεί τι συνέβη, γιατί, και τι να κάνετε:
+
+```
+======================  TCP single-flow window check  ======================
+  server                : 138.199.14.66:443
+  min RTT               : 14.1 ms
+      round-trip time to the server; every TCP window mechanism below scales with it
+  throughput            : 38.1 MiB/s  (320 Mbit/s, 32% of 1000 Mbit line)
+      what this single connection actually achieved during the sample
+  target BDP @ line     : 1.68 MiB   (= line_rate x RTT)
+      bandwidth-delay product: how many bytes must be "in the air" at once
+      to keep your full line busy at this RTT. The yardstick for everything below.
+  server in-flight      : peak 0.61 / p95 0.58 MiB
+      unacknowledged bytes the server kept on the wire (its send window / cwnd)
+  sustained in-flight   : 0.54 MiB   (= throughput x RTT)
+      the average actually sustained — if far below peak, the flow was bursty
+  your recv window (adv): 6.00 MiB   (raw 49152 x 2^7)
+      the most data YOU told the server it may send before waiting for ACKs
+  window scale (ss)     : 7,7   (snd,rcv shift; raw 16-bit window x 2^scale)
+----------------------------------------------------------------------------
+  Windows vs the BDP (longer bar = more bytes):
+    BDP target       ███████████                              1.68 MiB
+    server in-flight ████                                     0.58 MiB
+    your window      ████████████████████████████████████████ 6.00 MiB
+    sustained        ████                                     0.54 MiB
+    Whichever bar stops short of the BDP bar is the likely bottleneck;
+    if all bars reach it but throughput is still low, suspect loss/queueing.
+----------------------------------------------------------------------------
+  VERDICT: SERVER SEND-WINDOW limited (the remote end is the bottleneck).
+  What happened: you offered the server room for ~6.00 MiB of un-ACKed data,
+  but it never kept more than ~0.58 MiB in flight — below the ~1.68 MiB (BDP)
+  needed to fill your line at this RTT. [...]
+  What you can do (nothing on your box will fix this):
+    - use parallel connections (aria2c -x8, or a download manager)
+    - if you control the server: raise tcp_wmem and consider BBR there
+    - or simply pick a closer/better mirror (lower RTT shrinks the BDP)
+============================================================================
+```
+
+Μια εκτέλεση με `--servers` καταλήγει επιπλέον σε σύνοψη ταξινομημένη κατά RTT (ο
+κοντινότερος πρώτος) και σε ραβδόγραμμα ταχύτητας ανά server, χρωματισμένο κατά πόρισμα:
+
+```
+=====================  SUMMARY (sorted by RTT, closest first)  ====================
+    RTT ms    Mbit/s   %line  verdict                  server   url
+------------------------------------------------------------------------------------
+       8.2       940     94%  OK                       ams      https://ams.download.datapacket.com/1000mb.bin
+      14.1       320     32%  SERVER SEND-WINDOW limited fra    https://fra.download.datapacket.com/1000mb.bin
+      22.5       610     61%  RECEIVE-WINDOW limited   lon      https://lon.download.datapacket.com/1000mb.bin
+      48.9        85      8%  LOSS / CONGESTION limited ath     https://ath.download.datapacket.com/1000mb.bin
+------------------------------------------------------------------------------------
+  Throughput per server (bar = single-flow Mbit/s, color = verdict):
+
+  ams          8.2 ms  ██████████████████████████████████████████████████ 940
+  fra         14.1 ms  █████████████████ 320
+  lon         22.5 ms  ████████████████████████████████ 610
+  ath         48.9 ms  ████ 85
+
+  Legend: OK  RECEIVE-WINDOW (yours, fixable)  SERVER SEND-WINDOW  LOSS/CONGESTION
+====================================================================================
+```
 
 ## Ανάγνωση του πορίσματος
 
