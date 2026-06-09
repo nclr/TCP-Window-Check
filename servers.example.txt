@@ -12,7 +12,7 @@ https://lon.download.datapacket.com/1000mb.bin    # London
 https://par.download.datapacket.com/1000mb.bin    # Paris
 https://prg.download.datapacket.com/1000mb.bin    # Prague
 https://vie.download.datapacket.com/1000mb.bin    # Vienna
-https://waw.download.datapacket.com/1000mb.bin    # Warsaw
+https://war.download.datapacket.com/1000mb.bin    # Warsaw
 https://mil.download.datapacket.com/1000mb.bin    # Milan
 https://mad.download.datapacket.com/1000mb.bin    # Madrid
 https://sto.download.datapacket.com/1000mb.bin    # Stockholm
